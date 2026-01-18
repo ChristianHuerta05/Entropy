@@ -128,16 +128,39 @@ async def run_attack(url: str, run_id: str):
             
             try:
                 import re
+                report_data = None
+                
                 json_match = re.search(r'```json\s*(.*?)\s*```', final_text, re.DOTALL)
                 if json_match:
                     report_data = json.loads(json_match.group(1))
-                    findings.update(report_data)
-                elif final_text.strip().startswith('{'):
-                    report_data = json.loads(final_text)
-                    findings.update(report_data)
+                else:
+                    brace_match = re.search(r'\{[\s\S]*\}', final_text)
+                    if brace_match:
+                        try:
+                            report_data = json.loads(brace_match.group(0))
+                        except json.JSONDecodeError:
+                            pass
+                
+                if report_data and isinstance(report_data, dict):
+                    if "vulnerabilities" in report_data:
+                        findings["vulnerabilities"] = report_data["vulnerabilities"]
+                    if "inputs_found" in report_data:
+                        findings["inputs_found"] = report_data["inputs_found"]
+                    if "inputs_tested" in report_data:
+                        findings["inputs_tested"] = report_data["inputs_tested"]
+                    if "pages_visited" in report_data and report_data["pages_visited"]:
+                        findings["pages_visited"] = report_data["pages_visited"]
+                    if "recommendations" in report_data:
+                        findings["recommendations"] = report_data["recommendations"]
+                    if "risk_level" in report_data:
+                        findings["risk_level"] = report_data["risk_level"]
+                    if "summary" in report_data:
+                        findings["summary"] = report_data["summary"]
                 else:
                     findings["summary"] = final_text[:500] if final_text else "Scan completed."
-            except (json.JSONDecodeError, Exception):
+                    
+            except Exception as e:
+                log_to_db(run_id, f"JSON parse error: {str(e)}", "error")
                 findings["summary"] = final_text[:500] if final_text else f"Completed {findings['steps_completed']} steps."
             
             results = history.action_results()
