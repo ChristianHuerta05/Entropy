@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+browser-use
+langchain-google-genai
+firebase-admin
+python-dotenv
